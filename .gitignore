@@ -12,3 +12,8 @@ wheels/
 *.env
 
 uv.lock
+
+chroma_db/
+
+purchase_agent_project/MCP_Servers/catalog_mcp/temp.py
+purchase_agent_project/agents/temp.py

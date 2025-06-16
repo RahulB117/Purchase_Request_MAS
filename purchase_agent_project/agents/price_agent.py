@@ -1,46 +1,47 @@
-import asyncio
 import os
-from dotenv import load_dotenv
-from crewai import Agent
-from mcp import ClientSession, StdioServerParameters, types
-from mcp.client.stdio import stdio_client
 import json
+import asyncio
+from dotenv import load_dotenv
+from typing import Any
+
+from crewai import Agent
+from fastmcp import Client
 
 load_dotenv()
 assert os.getenv("OPENAI_API_KEY"), "Missing OPENAI_API_KEY"
 
 
 class PriceAgent(Agent):
-    def __init__(self, **kwargs):
+    
+    
+    def __init__(self, server_url: str, **kwargs):
         super().__init__(**kwargs)
+        self._server_url = server_url
 
     async def call_tool(self, tool_name: str, params: dict):
         """Call an MCP tool over stdio"""
-        server_params = StdioServerParameters(
-            command="python",
-            args=["purchase_agent_project/MCP_Servers/catalog_mcp/server.py"]
-        )
-        async with stdio_client(server_params) as (reader, writer):
-            async with ClientSession(reader, writer) as session:
-                await session.initialize()
-                response = await session.list_tools()
-                tools = response.tools
-                print("\nConnected to server with tools:", [tool.name for tool in tools])
-                
-                result = await session.call_tool(tool_name, arguments=params)
-                if isinstance(result.content, list) and hasattr(result.content[0], "text"):
-                    raw_text = result.content[0].text
-                    try:
-                        # Try parsing as JSON if it looks like a dict or list
-                        return json.loads(raw_text)
-                    except json.JSONDecodeError:
-                        return raw_text
-                else:
-                    return result.content
+        
+        async with Client(self._server_url) as client:
+            tools = await client.list_tools()
+            print("Available tools:", [t.name for t in tools])
+            resp = await client.call_tool(tool_name, params)
+            
+            contents = resp
+            if hasattr(resp, "text"):
+                contents = [resp]
+            elif isinstance(resp, list):
+                contents = resp
+            
+            text = "".join(c.text for c in contents).strip()
+            # attempt JSON parse, else return raw string
+            try:
+                return json.loads(text)
+            except json.JSONDecodeError:
+                return text
 
     async def run(self, request_json: dict):
         item = request_json.get("item")
-        quantity = request_json.get("quantity", 1)
+        quantity = request_json.get("quantity", 2)
 
         print(f"Building catalog for '{item}'...")
         build = await self.call_tool("build_catalog", {"query": item})
@@ -57,6 +58,7 @@ class PriceAgent(Agent):
 # Test it from CLI
 if __name__ == "__main__":
     agent = PriceAgent(
+        server_url="http://127.0.0.1:8000/mcp",
         role="pricing_analyst",
         goal="Find best vendor and compute price",
         backstory="Helps identify the most cost-effective supplier for a requested item."
@@ -71,4 +73,4 @@ if __name__ == "__main__":
     }
 
     result = asyncio.run(agent.run(test_input))
-    print("Final PriceAgent Output:", result)
+    print("Final PriceAgent Output:", json.dumps(result, indent=2))
