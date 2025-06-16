@@ -1,0 +1,93 @@
+from mcp.server.fastmcp import FastMCP
+import requests
+import chromadb
+from chromadb.config import Settings
+from sentence_transformers import SentenceTransformer
+
+# Initialize ChromaDB and collection
+chroma_client = chromadb.Client(Settings(anonymized_telemetry=False))
+collection_name = "catalog_collection"
+collection = chroma_client.get_or_create_collection(collection_name)
+
+# Load embedding model
+embedder = SentenceTransformer("all-MiniLM-L6-v2")
+
+# Start FastMCP server
+mcp = FastMCP(name="catalog")
+print(dir(mcp))
+
+
+@mcp.tool()
+def build_catalog(query: str) -> str:
+    """
+    Pulls products from fakestoreapi.com, embeds product titles,
+    and stores vendor metadata in ChromaDB.
+    """
+    try:
+        res = requests.get("https://fakestoreapi.com/products", timeout=5)
+        products = res.json()
+    except Exception as e:
+        return f"API fetch error: {e}"
+
+    matching = [
+        p for p in products if query.lower() in p["title"].lower()
+    ]
+
+    if not matching:
+        return f"No matches found for '{query}'."
+
+    titles = [p["title"] for p in matching]
+    embeddings = embedder.encode(titles).tolist()
+    print(f"[build_catalog] Matching products found: {len(matching)}")
+    print(f"[build_catalog] Collection count BEFORE insert: {collection.count()}")
+
+    for i, product in enumerate(matching):
+        collection.add(
+            documents=[product["title"]],
+            embeddings=[embeddings[i]],
+            metadatas=[{"vendor": "FakeStore", "unit_price": round(product["price"], 2)}],
+            ids=[f"{product['id']}_{query}_{i}"]
+        )
+    print(f"[build_catalog] Collection count AFTER insert: {collection.count()}")
+    return f"{len(matching)} products embedded into catalog for query '{query}'."
+
+
+@mcp.tool()
+def get_catalog_item(item_name: str) -> list:
+    """
+    Returns top-5 semantically matched products to the item name.
+    """
+    print(f"[get_catalog_item] Querying for: {item_name}")
+    print(f"[get_catalog_item] Current collection count: {collection.count()}")
+    query_embedding = embedder.encode([item_name]).tolist()
+    results = collection.query(
+        query_embeddings=query_embedding,
+        n_results=5
+    )
+    print(f"[get_catalog_item] Matches returned: {len(results['metadatas'][0]) if results['metadatas'] else 0}")
+    return results["metadatas"][0] if results["metadatas"] else []
+
+
+@mcp.tool()
+def get_price(item_name: str, quantity: int) -> dict:
+    """
+    Selects best price among top matches and computes total cost.
+    """
+    print(f"[get_price] Fetching price for {quantity} x {item_name}")
+    entries = get_catalog_item(item_name)
+    print(f"[get_price] Entries found: {len(entries)}")
+    if not entries:
+        return {"error": f"No items found for '{item_name}'."}
+
+    best = min(entries, key=lambda x: x["unit_price"])
+    return {
+        "vendor": best["vendor"],
+        "unit_price": best["unit_price"],
+        "total_price": round(best["unit_price"] * quantity, 2),
+        "currency": "USD"
+    }
+
+
+if __name__ == "__main__":
+    print("Starting Catalog MCP server...")
+    mcp.run(transport="stdio")

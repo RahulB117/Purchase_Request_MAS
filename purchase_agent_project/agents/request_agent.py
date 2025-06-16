@@ -21,7 +21,8 @@ if __name__ == "__main__":
     test_agent = RequestAgent(
         role="procurement_parser",
         goal="Extract structured purchase request JSON",
-        backstory="Transforms natural-language buy requests into JSON package."
+        backstory="Transforms natural-language buy requests into JSON package.",
+        llm_model=os.getenv("MODEL", "gpt-4o-mini")
     )
     test_input = "Need 5 studio mics for Alice by June 20"
     print("Input:", test_input)
