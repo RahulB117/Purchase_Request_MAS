@@ -5,7 +5,7 @@ from chromadb.config import Settings
 from sentence_transformers import SentenceTransformer
 
 # Initialize ChromaDB and collection
-chroma_client = chromadb.Client(Settings(anonymized_telemetry=False))
+chroma_client = chromadb.Client(Settings(persist_directory="chroma_db", anonymized_telemetry=False))
 collection_name = "catalog_collection"
 collection = chroma_client.get_or_create_collection(collection_name)
 
@@ -13,8 +13,8 @@ collection = chroma_client.get_or_create_collection(collection_name)
 embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
 # Start FastMCP server
-mcp = FastMCP(name="catalog")
-print(dir(mcp))
+mcp = FastMCP(name="catalog", host="127.0.0.1", port=8000, path="/mcp")
+#print(dir(mcp))
 
 
 @mcp.tool()
@@ -48,6 +48,8 @@ def build_catalog(query: str) -> str:
             metadatas=[{"vendor": "FakeStore", "unit_price": round(product["price"], 2)}],
             ids=[f"{product['id']}_{query}_{i}"]
         )
+    chroma_client.persist()
+
     print(f"[build_catalog] Collection count AFTER insert: {collection.count()}")
     return f"{len(matching)} products embedded into catalog for query '{query}'."
 
@@ -90,4 +92,4 @@ def get_price(item_name: str, quantity: int) -> dict:
 
 if __name__ == "__main__":
     print("Starting Catalog MCP server...")
-    mcp.run(transport="stdio")
+    mcp.run(transport="streamable-http")
