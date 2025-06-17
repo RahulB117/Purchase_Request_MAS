@@ -52,8 +52,19 @@ class PriceAgent(Agent):
         print("Top match:", catalog)
 
         print(f"Getting price for {quantity}x {item}...")
-        price = await self.call_tool("get_price", {"item_name": item, "quantity": quantity})
-        return price
+        price_info  = await self.call_tool("get_price", {
+            "item_name": item,
+            "quantity": quantity
+        })
+        result = {
+            "requester": request_json.get("requester"),
+            "quantity": quantity,
+            "vendor":     price_info["vendor"],
+            "unit_price": price_info["unit_price"],
+            "total_price": price_info["total_price"],
+            "currency":   price_info["currency"],
+        }
+        return result
 
 # Test it from CLI
 if __name__ == "__main__":
