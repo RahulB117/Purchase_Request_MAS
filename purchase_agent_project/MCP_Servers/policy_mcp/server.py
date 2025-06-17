@@ -3,27 +3,30 @@ from fastmcp import FastMCP
 mcp  = FastMCP(name = "policy")
 
 # Only registered users can make purchases
-@mcp.resource("config://policy_database")
-def policy_database():
-    return {
-        "price_thresholds": {
-            "Sarosh": 1000,
-            "Ujwal": 1000,
-            "Aditya": 1000,
-            "Joel": 1000,
-            "__default__": 0  # Default threshold for others
-        },
-        "registered_vendors": {
-            "Sarosh": ["FakeStore", "eBay"],
-            "Ujwal": ["FakeStore", "eBay"],
-            "Aditya": ["FakeStore", "eBay"],
-            "Joel": ["FakeStore", "eBay"],
-            "__default__": []  # Default vendor for others
-        }
-    }
-    
+_POLICY_DB = {
+    "price_thresholds": {
+        "Sarosh": 1000,
+        "Ujwal": 500,
+        "Aditya": 1000,
+        "Joel": 1000,
+        "__default__": 0 # Default threshold for others
+    },
+    "registered_vendors": {
+        "Sarosh": ["FakeStore", "eBay"],
+        "Ujwal": ["FakeStore", "eBay"],
+        "Aditya": ["FakeStore", "eBay"],
+        "Joel": ["FakeStore", "eBay"],
+        "__default__": []# Default vendor for others
+    },
+}
+
+
+# @mcp.resource("config://policy_database")
+# def policy_database():
+#     return _POLICY_DB
+
 @mcp.tool()
-def get_approved_price(requester: str, data=policy_database) -> float:
+def get_approved_price(requester: str, data=_POLICY_DB) -> float:
     """
     returns allowed price threshold for requester.
     returns 0 if requester is not registered.
@@ -34,7 +37,7 @@ def get_approved_price(requester: str, data=policy_database) -> float:
         )
     
 @mcp.tool()
-def get_registered_vendors(requester: str, data=policy_database) -> list:
+def get_registered_vendors(requester: str, data=_POLICY_DB) -> list:
     """
     returns list of registered vendors for requester.
     returns empty list if requester is not registered.
@@ -48,8 +51,7 @@ def get_registered_vendors(requester: str, data=policy_database) -> list:
 def check_policy(
     requester: str,
     vendor: str,
-    total_price: float,
-    data = policy_database
+    total_price: float
     ) -> dict:
     """
     Checks if total_price is within the allowed threshold.
@@ -57,6 +59,7 @@ def check_policy(
     Returns Approval Status with reason if not approved.
     """
     reasons = []
+    data = _POLICY_DB
     price_threshold = data["price_thresholds"].get(
         requester,
         data["price_thresholds"]["__default__"]
