@@ -1,9 +1,9 @@
 import os
 import json
 import asyncio
+import re
 from dotenv import load_dotenv
 from typing import Any
-
 from crewai import Agent
 from fastmcp import Client
 
@@ -23,7 +23,7 @@ class PriceAgent(Agent):
         
         async with Client(self._server_url) as client:
             tools = await client.list_tools()
-            print("Available tools:", [t.name for t in tools])
+            #print("Available tools:", [t.name for t in tools])
             resp = await client.call_tool(tool_name, params)
             
             contents = resp
@@ -39,32 +39,98 @@ class PriceAgent(Agent):
             except json.JSONDecodeError:
                 return text
 
-    async def run(self, request_json: dict):
-        item = request_json.get("item")
-        quantity = request_json.get("quantity", 2)
-
-        print(f"Building catalog for '{item}'...")
-        build = await self.call_tool("build_catalog", {"query": item})
-        print("Catalog build result:", build)
-
-        print(f"Searching for top matches for '{item}'...")
-        catalog = await self.call_tool("get_catalog_item", {"item_name": item})
-        print("Top match:", catalog)
-
-        print(f"Getting price for {quantity}x {item}...")
-        price_info  = await self.call_tool("get_price", {
-            "item_name": item,
-            "quantity": quantity
-        })
-        result = {
-            "requester": request_json.get("requester"),
-            "quantity": quantity,
-            "vendor":     price_info["vendor"],
-            "unit_price": price_info["unit_price"],
-            "total_price": price_info["total_price"],
-            "currency":   price_info["currency"],
+    async def run(self, request_json: dict) -> dict:
+        """
+        Takes Input JSON from RequestAgent:
+        {
+            "request_id": "1",
+            "item": "studio mics",
+            "quantity": 5,
+            "requester": "name of requester",
+            "date": "2023-06-20"
         }
-        return result
+
+        Agent uses MCP tools to:
+        1. Build catalog for the requested item
+        2. Search for top matches in the catalog
+        3. Get price for the requested quantity
+        4. Return structured output JSON with vendor and pricing details
+
+        {
+            "request_id":  request_id,
+            "vendor":      choice["vendor"],
+            "unit_price":  choice["unit_price"],
+            "total_price": round(choice["unit_price"] * quantity, 2),
+            "currency":    "USD"
+        }
+        """
+        request_id = request_json.get("request_id")
+        item       = request_json.get("item")
+        quantity   = request_json.get("quantity", 1)
+
+        plan_prompt = f"""
+            You are a pricing agent. The user wants {quantity}×'{item}'.
+            Should you call:
+                1) build_catalog(query)
+                2) get_catalog_item(item_name)
+            Respond with JSON: {{ "tool": "<tool_name>", "params": {{ ... }} }}
+            """
+        plan_resp = await asyncio.to_thread(self.llm.call, plan_prompt)
+        #print("PLAN:", plan_resp)
+        clean = plan_resp.strip()
+        clean = re.sub(r"^```(?:json)?\s*", "", clean)
+        clean = re.sub(r"\s*```$", "", clean)
+        plan = json.loads(clean)
+
+        if plan["tool"] == "build_catalog":
+            await self.call_tool("build_catalog", plan["params"])
+            catalog = await self.call_tool("get_catalog_item", {"item_name": item})
+        else:
+            # direct get_catalog_item or other tool
+            catalog = await self.call_tool(plan["tool"], plan["params"])
+
+        decision_prompt = f"""
+            Here are the catalog entries: {json.dumps(catalog, indent=2)}
+            Which vendor should we pick for {quantity}×'{item}', and why?
+            Answer with JSON: {{ "vendor": string, "unit_price": number, "reason": string }}
+            """
+        decision_resp = await asyncio.to_thread(self.llm.call, decision_prompt)
+        #print("DECISION:", decision_resp)
+        clean = decision_resp.strip()
+        clean = re.sub(r"^```(?:json)?\s*", "", clean)
+        clean = re.sub(r"\s*```$", "", clean)
+        choice = json.loads(clean)
+
+        llm_price = choice["unit_price"]
+        llm_total = round(choice["unit_price"] * quantity, 2)
+        # Verify against the catalog’s own pricing logic
+        verify = await self.call_tool(
+            "get_price",
+            {"item_name": item, "quantity": quantity}
+        )
+
+        # If there’s a mismatch, override and log it
+        if (verify["unit_price"], verify["total_price"]) != (llm_price, llm_total):
+            print(
+            f"LLM price {llm_price} vs. tool price {verify['unit_price']}, "
+            "overriding with tool value"
+            )
+            choice["unit_price"]  = verify["unit_price"]
+            choice["total_price"] = verify["total_price"]
+        else:
+            choice["total_price"] = llm_total
+
+        quote = {
+            "request_id":  request_id,
+            "requester":   request_json.get("requester"),
+            "vendor":      choice["vendor"],
+            "unit_price":  choice["unit_price"],
+            "quantity":    quantity,
+            "total_price": round(choice["unit_price"] * quantity, 2),
+            "currency":    "USD",
+            "reason": choice["reason"]
+        }
+        return quote
 
 # Test it from CLI
 if __name__ == "__main__":
