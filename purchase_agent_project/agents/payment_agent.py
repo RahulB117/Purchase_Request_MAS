@@ -2,6 +2,7 @@ import asyncio
 import os
 import json
 import re
+import textwrap
 from datetime import date, timedelta
 from dotenv import load_dotenv
 from crewai import Agent
@@ -54,14 +55,14 @@ class PaymentAgent(Agent):
         reminder_date = due - timedelta(days=1)
         reminder_text = f"Remind to pay {vendor} {amount:.2f} {currency} on {reminder_date.isoformat()}"
 
-        plan_prompt = f"""
+        plan_prompt = textwrap.dedent(f"""
             You are a payment agent. The amount is {amount:.2f} {currency} to {vendor}, due on {due_date_str}.
             Decide if you should generate:
                 1. JSON instruction,
                 2. CSV instruction,
                 3. A friendly email reminder?
             Respond *only* with JSON: {{ "format": "<JSON|CSV|EMAIL>", "notes": string }}
-            """
+            """)
         plan_resp = await asyncio.to_thread(self.llm.call, plan_prompt)
         cleaned_plan = plan_resp.strip()
         cleaned_plan = re.sub(r"^```(?:json)?\s*", "", cleaned_plan)
@@ -69,21 +70,21 @@ class PaymentAgent(Agent):
         plan = json.loads(cleaned_plan)
         # print("Payment Plan:", plan)
 
-        format = plan["format"].upper()
-        if format == "EMAIL":
-            email_prompt = f"""
+        format_inst = plan["format"].upper()
+        if format_inst == "EMAIL":
+            email_prompt = textwrap.dedent(f"""
                 Compose a friendly email reminder for {vendor} payment of {amount:.2f} {currency} due on {due_date_str}.
                 Include the reminder text: "{reminder_text}"
                 Ensure the mail is sent to {requester} and of formal mail format.
-                Respond *only* with JSON: {{ To": string, "Subject": string, "Body": string }}
-                """
+                Respond *only* with JSON: {{ "To": string, "Subject": string, "Body": string }}
+                """)
             raw_instr = await asyncio.to_thread(self.llm.call, email_prompt)
             instructions = raw_instr.strip()
             instructions = re.sub(r"^```(?:json)?\s*", "", instructions)
             instructions = re.sub(r"\s*```$", "", instructions)
             email = json.loads(instructions)
             # print("Email Reminder:", email)
-        elif format == "CSV":
+        elif format_inst == "CSV":
             instructions = f"vendor,amount,currency,due_date\n{vendor},{amount:.2f},{currency},{due_date_str}"
         else:
             instructions = {
@@ -99,7 +100,7 @@ class PaymentAgent(Agent):
             "vendor": vendor,
             "total_price": amount,
             "approved": True,
-            "format": format,
+            "format": format_inst,
             "payment_instruction": instructions,
             "notes": plan.get("notes", ""),
          }

@@ -2,6 +2,7 @@ import os
 import json
 import asyncio
 import re
+import textwrap
 from dotenv import load_dotenv
 from typing import Any
 from crewai import Agent
@@ -56,7 +57,7 @@ class PolicyAgent(Agent):
         vendor      = input_json["vendor"]
         total_price = input_json["total_price"]
 
-        plan_prompt = f"""
+        plan_prompt = textwrap.dedent(f"""
             You are a policy agent. Given:
                 requester: {requester}
                 vendor:    {vendor}
@@ -71,7 +72,7 @@ class PolicyAgent(Agent):
                     {{ "tool": "<tool_name>", "params": {{ ... }} }},
                     ...
             ] }}
-            """
+            """)
         raw_plan = await asyncio.to_thread(self.llm.call, plan_prompt)
         # print("PLAN:", raw_plan)
         plan_str = raw_plan.strip()
@@ -94,12 +95,12 @@ class PolicyAgent(Agent):
                 "total_price": total_price
             })
 
-        decision_prompt = f"""
+        decision_prompt = textwrap.dedent(f"""
             Policy tool returned: {json.dumps(policy, indent=2)}
             Based on this, should we approve or reject?
             Answer *only* with JSON:
             {{ "approved": bool, "reason": string, "escalate": bool }}
-            """
+            """)
         raw_dec = await asyncio.to_thread(self.llm.call, decision_prompt)
         # print("DECISION:", raw_dec)
         cleaned_dec = raw_dec.strip()

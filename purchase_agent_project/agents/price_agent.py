@@ -2,6 +2,7 @@ import os
 import json
 import asyncio
 import re
+import textwrap
 from dotenv import load_dotenv
 from typing import Any
 from crewai import Agent
@@ -68,13 +69,13 @@ class PriceAgent(Agent):
         item       = request_json.get("item")
         quantity   = request_json.get("quantity", 1)
 
-        plan_prompt = f"""
+        plan_prompt = textwrap.dedent(f"""
             You are a pricing agent. The user wants {quantity}×'{item}'.
             Should you call:
                 1) build_catalog(query)
                 2) get_catalog_item(item_name)
             Respond with JSON: {{ "tool": "<tool_name>", "params": {{ ... }} }}
-            """
+            """)
         plan_resp = await asyncio.to_thread(self.llm.call, plan_prompt)
         #print("PLAN:", plan_resp)
         clean = plan_resp.strip()
@@ -89,11 +90,11 @@ class PriceAgent(Agent):
             # direct get_catalog_item or other tool
             catalog = await self.call_tool(plan["tool"], plan["params"])
 
-        decision_prompt = f"""
+        decision_prompt = textwrap.dedent(f"""
             Here are the catalog entries: {json.dumps(catalog, indent=2)}
             Which vendor should we pick for {quantity}×'{item}', and why?
             Answer with JSON: {{ "vendor": string, "unit_price": number, "reason": string }}
-            """
+            """)
         decision_resp = await asyncio.to_thread(self.llm.call, decision_prompt)
         #print("DECISION:", decision_resp)
         clean = decision_resp.strip()
