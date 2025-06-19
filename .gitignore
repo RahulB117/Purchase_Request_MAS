@@ -8,12 +8,14 @@ wheels/
 
 # Virtual environments
 .Customer_env
+purchase_agent_project/MCP_Servers/catalog_mcp/.venv_server/
 
 *.env
 
 uv.lock
 
 chroma_db/
+purchase_agent_project/MCP_Servers/catalog_mcp/chroma_db/
 
 purchase_agent_project/MCP_Servers/catalog_mcp/temp.py
 purchase_agent_project/agents/temp.py

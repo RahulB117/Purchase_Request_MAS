@@ -9,46 +9,44 @@ from agents.payment_agent import PaymentAgent as _RawPaymentAgent
 
 load_dotenv()
 
-@agent(
-    name="request_agent",
-    role="procurement_parser",
-    goal="Extract structured purchase request JSON",
-    backstory="Transforms natural-language buy requests into structured JSON packages."
-)
-def request_agent():
+@agent
+def request_agent() -> Agent:
     return _RawRequestAgent(
+        name="request_agent",
+        role="procurement_parser",
+        goal="Extract structured purchase request JSON",
+        backstory="Transforms natural-language buy requests into structured JSON packages.",
         llm_model=os.getenv("MODEL", "gpt-4o-mini")
     )
 
-@agent(
-    name="price_agent",
-    role="pricing_analyst",
-    goal="Find best vendor and compute price",
-    backstory="Helps identify the most cost-effective supplier for a requested item."
-)
-def price_agent():
+@agent
+def price_agent() -> Agent:
     return _RawPriceAgent(
+        server_url="http://localhost:8000/mcp",
+        name="price_agent",
+        role="pricing_analyst",
+        goal="Find best vendor and compute price",
+        backstory="Helps identify the most cost-effective supplier for a requested item.",
         llm_model=os.getenv("MODEL", "gpt-4o-mini")
     )
 
-@agent(
-    name="policy_agent",
-    role="approval_officer",
-    goal="Approve or reject quotes per policy",
-    backstory="Automates policy checks for spend thresholds and vendor preferences."
-)
-def policy_agent():
+@agent
+def policy_agent() -> Agent:
     return _RawPolicyAgent(
+        server_url="http://localhost:8001/mcp",
+        name="policy_agent",
+        role="approval_officer",
+        goal="Approve or reject quotes per policy",
+        backstory="Automates policy checks for spend thresholds and vendor preferences.",
         llm_model=os.getenv("MODEL", "gpt-4o-mini")
     )
 
-@agent(
-    name="payment_agent",
-    role="payment_processor",
-    goal="Generate payment instructions for approved quotes",
-    backstory="Formats payment instructions in JSON/CSV, flags manual review, and suggests reminders."
-)
-def payment_agent():
+@agent
+def payment_agent() -> Agent:
     return _RawPaymentAgent(
+        name="payment_agent",
+        role="payment_processor",
+        goal="Generate payment instructions for approved quotes",
+        backstory="Formats payment instructions in JSON/CSV, flags manual review, and suggests reminders.",
         llm_model=os.getenv("MODEL", "gpt-4o-mini")
     )

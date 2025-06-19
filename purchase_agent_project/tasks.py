@@ -1,5 +1,6 @@
 from crewai import Task
 from textwrap import dedent
+from tools_mcp import catalog_tools, policy_tools
 
 class OrderToPay():
     def _tip_section(self):
@@ -23,11 +24,6 @@ class OrderToPay():
             ),
             agent=agent,
             tools = [],
-            config = {
-                "role": "procurement_parser",
-                "goal": "Extract structured purchase request JSON",
-                "backstory":"Transforms natural-language buy requests into JSON package."
-            }
             expected_output="JSON with request_id, item, quantity, requester, date"
         )
     
@@ -56,13 +52,7 @@ class OrderToPay():
                 """
             ),
             agent=agent,
-            tools=["build_catalog", "get_catalog_item", "get_price"],
-            config = {
-                "role":"pricing_analyst",
-                "goal":"Find best vendor and compute price",
-                "backstory":"Helps identify the most cost-effective supplier for a requested item."
-                
-            },
+            tools=catalog_tools,
             expected_output=dedent(
                 """
                 {
@@ -101,13 +91,8 @@ class OrderToPay():
                 """
             ),
             agent=agent,
-            tools=["get_approved_price", "get_registered_vendors", "check_policy"],
-            config = {
-                "role":"approval_officer",
-                "goal":"Approve or reject quotes per policy",
-                "backstory":"Automates policy checks for spend thresholds and vendor preferences."
-            },
-            expected_output=dedent(f"""
+            tools=policy_tools,
+            expected_output=dedent("""
                 {
                     "requester": "<requester_name>",
                     "vendor": "<vendor_name>",
@@ -144,12 +129,7 @@ class OrderToPay():
             ),
             agent=agent,
             tools=[],
-            config = {
-                "role":"payment_processor",
-                "goal":"Generate payment instructions for approved quotes",
-                "backstory":"Formats payment instruction in JSON/CSV, flags manual review, and suggests reminders."
-            },
-            expected_output=dedent(f"""
+            expected_output=dedent("""
             {
                 "requester": "<requester_name>",
                 "vendor": "<vendor_name>",

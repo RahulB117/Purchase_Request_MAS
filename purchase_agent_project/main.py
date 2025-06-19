@@ -1,9 +1,10 @@
-from crewai import Crew, process
+from crewai import Crew
 
-from agents.request_agent import RequestAgent
-from agents.price_agent import PriceAgent
-from agents.policy_agent import PolicyAgent
-from agents.payment_agent import PaymentAgent
+# from agents.request_agent import RequestAgent
+# from agents.price_agent import PriceAgent
+# from agents.policy_agent import PolicyAgent
+# from agents.payment_agent import PaymentAgent
+from agents_data import request_agent, price_agent, policy_agent, payment_agent
 from tasks import OrderToPay
 
 class OrderToPayCrew():
@@ -12,10 +13,10 @@ class OrderToPayCrew():
     
     def run(self):
         task_list = OrderToPay()
-        requestAgent = RequestAgent
-        priceAgent = PriceAgent
-        policyAgent = PolicyAgent
-        paymentAgent = PaymentAgent
+        requestAgent = request_agent()
+        priceAgent = price_agent()
+        policyAgent = policy_agent()
+        paymentAgent = payment_agent()
         
         
         task_parse   = task_list.parse_request(requestAgent, self.user_input)
@@ -30,8 +31,7 @@ class OrderToPayCrew():
                 "catalog": "http://localhost:8000/mcp",
                 "policy":  "http://localhost:8001/mcp",
             },
-            verbose = True,
-            process = process.sequential
+            verbose = True
         )
         result = crew.kickoff()
         return result
