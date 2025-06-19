@@ -7,10 +7,14 @@ from dotenv import load_dotenv
 from typing import Any
 from crewai import Agent
 from fastmcp import Client
+import pathlib
 
 load_dotenv()
 assert os.getenv("OPENAI_API_KEY"), "Missing OPENAI_API_KEY"
 
+__version__ = "2025-06-19_v1"
+print(f"[PolicyAgent] VERSION {__version__}")
+print(f"[PolicyAgent] LOADED FROM {pathlib.Path(__file__).resolve()}")
 
 class PriceAgent(Agent):
     
@@ -64,7 +68,8 @@ class PriceAgent(Agent):
                 "quantity": <quantity>,
                 "total_price": <total_price>,
                 "currency": "USD",
-                "reason": "<reason_for_choice>"
+                "reason": "<reason_for_choice>",
+                "status": <True|False>
             }
         """
         request_id = request_json.get("request_id")
@@ -100,9 +105,13 @@ class PriceAgent(Agent):
         # print("CATALOG:", catalog)
         decision_prompt = textwrap.dedent(f"""
             Here are the catalog entries: {json.dumps(catalog, indent=2)}
-            Which vendor should we pick for {quantity}×'{item}', and why?
-            Ensure to calculate the unit_price as the price of a single item.
-            Answer with JSON: {{ "vendor": string, "unit_price": number, "reason": string }}
+            if the catalog is empty set the unit_price to 0, vendor to "Not applicable" and status to boolean False.
+                Answer with JSON: {{ "status": string, "vendor": string, "unit_price": number, "reason": string }}
+            else do the following,
+                Which vendor should we pick for {quantity}×'{item}', and why?
+                Ensure to calculate the unit_price as the price of a single item.
+                Respond ONLY with JSON. Do not add any explanation or markdown. Set the status to boolean True.
+                Answer with JSON: {{ "status": string, "vendor": string, "unit_price": number, "reason": string }}
             """)
         decision_resp = await asyncio.to_thread(self.llm.call, decision_prompt)
         # print("DECISION:", decision_resp)
@@ -110,6 +119,10 @@ class PriceAgent(Agent):
         clean = re.sub(r"^```(?:json)?\s*", "", clean)
         clean = re.sub(r"\s*```$", "", clean)
         choice = json.loads(clean)
+        raw = choice.get("status")
+        if isinstance(raw, str):
+            choice["status"] = raw.lower() == "true"
+        # print(choice)
 
         llm_price = choice["unit_price"]
         llm_total = round(choice["unit_price"] * quantity, 2)
@@ -118,17 +131,17 @@ class PriceAgent(Agent):
             "get_price",
             {"item_name": item, "quantity": quantity}
         )
-
-        # If there’s a mismatch, override and log it
-        if (verify["unit_price"], verify["total_price"]) != (llm_price, llm_total):
-            print(
-            f"LLM price {llm_price} vs. tool price {verify['unit_price']}, "
-            "overriding with tool value"
-            )
-            choice["unit_price"]  = verify["unit_price"]
-            choice["total_price"] = verify["total_price"]
-        else:
-            choice["total_price"] = llm_total
+        if "error" not in verify:
+            # If there’s a mismatch, override and log it
+            if (verify["unit_price"], verify["total_price"]) != (llm_price, llm_total):
+                print(
+                f"LLM price {llm_price} vs. tool price {verify['unit_price']}, "
+                "overriding with tool value"
+                )
+                choice["unit_price"]  = verify["unit_price"]
+                choice["total_price"] = verify["total_price"]
+            else:
+                choice["total_price"] = llm_total
 
         quote = {
             "request_id":  request_id,
@@ -138,7 +151,8 @@ class PriceAgent(Agent):
             "quantity":    quantity,
             "total_price": round(choice["unit_price"] * quantity, 2),
             "currency":    "USD",
-            "reason": choice["reason"]
+            "reason": choice["reason"],
+            "status": choice["status"]
         }
         return quote
 
@@ -153,10 +167,10 @@ if __name__ == "__main__":
 
     test_input = {
         "request_id": "req-001",
-        "item": "laptop",
+        "item": "godzilla",
         "quantity": 2,
         "requester": "Alice",
-        "date": "2025-06-20"
+        "date": "2025-06-20",
     }
 
     result = asyncio.run(agent.run(test_input))

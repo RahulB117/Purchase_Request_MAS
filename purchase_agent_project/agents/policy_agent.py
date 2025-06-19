@@ -23,7 +23,8 @@ class PolicyAgent(Agent):
         "quantity:": 2,
         "total_price": 219.9,
         "currency": "USD",
-        "reason": "Populated by PriceAgent"
+        "reason": "Populated by PriceAgent",
+        "status": "True/False"
     }
     Calls the MCP tool 'check_policy' from policy_mcp server to verify if the request is within policy limits.
     Returns an output JSON:
@@ -31,9 +32,10 @@ class PolicyAgent(Agent):
         "requester": "<requester_name>",
         "vendor": "<vendor_name>",
         "total_price": <total_price>,
-        "approved": true/false,
+        "approved": True/False,
         "reason": "<reason_for_approval_or_denial>",
-        "escalate": true/false
+        "escalate": True/False,
+        "status": True/False
     }
     """
     def __init__(self, **kwargs):
@@ -55,6 +57,13 @@ class PolicyAgent(Agent):
         requester   = input_json["requester"]
         vendor      = input_json["vendor"]
         total_price = input_json["total_price"]
+        status = input_json["status"]
+        if status is False or (isinstance(status, str) and status.lower() != "true"):
+            return {
+                **input_json,
+                "approved": False,
+                "escalate":  True,
+            }
 
         plan_prompt = textwrap.dedent(f"""
             You are a policy agent. Given:
@@ -97,6 +106,7 @@ class PolicyAgent(Agent):
         decision_prompt = textwrap.dedent(f"""
             Policy tool returned: {json.dumps(policy, indent=2)}
             Based on this, should we approve or reject?
+            If we don't approve, set escalate to True
             Answer *only* with JSON:
             {{ "approved": bool, "reason": string, "escalate": bool }}
             """)
@@ -133,7 +143,8 @@ if __name__ == "__main__":
       "quantity":   2,
       "total_price":219.9,
       "currency":   "USD",
-      "reason":     "Test Populated by PriceAgent"
+      "reason":     "Test Populated by PriceAgent",
+      "status": False
     }
 
     result = asyncio.run(agent.run(test_input))

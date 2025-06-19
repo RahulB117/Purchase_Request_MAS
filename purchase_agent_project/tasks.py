@@ -46,6 +46,7 @@ class OrderToPay():
                         - total_price: Total price for the requested quantity
                         - currency: Currency of the price (default is "USD")
                         - reason: Reason for the choice of vendor
+                        - status: False when item is missing in catalog
                 **Parameters**:
                     - request_json: {request_json}
                 **Note**: {self._tip_section()}
@@ -63,7 +64,8 @@ class OrderToPay():
                     "quantity": <quantity>,
                     "total_price": <total_price>,
                     "currency": "USD",
-                    "reason": "<reason_for_choice>"
+                    "reason": "<reason_for_choice>",
+                    "status": <True|False>
                 }
                 """
             )
@@ -84,6 +86,7 @@ class OrderToPay():
                     - approved: True if within policy, False otherwise
                     - reason: Reason for approval/denial
                     - escalate: True if manual review is required
+                    - status: False when item is missing in catalog
                     
                 **Parameters**:
                     - request_json: {request_json}
@@ -99,7 +102,8 @@ class OrderToPay():
                     "total_price": <total_price>,
                     "approved": true,
                     "reason": "<reason_for_approval_or_denial>",
-                    "escalate": false
+                    "escalate": <True|False>,
+                    "status": <True|False>
                 }
                 """
             )
@@ -122,6 +126,7 @@ class OrderToPay():
                         - format: Either email, JSON or CSV
                         - payment_instruction: Detailed payment instruction to be mailed, formatted or otherwise
                         - notes: payment reminder date.
+                        - status: False when item is missing in catalog
                 **Parameters**:
                     - request_json: {request_json}
                 **Note**: {self._tip_section()}
@@ -134,10 +139,11 @@ class OrderToPay():
                 "requester": "<requester_name>",
                 "vendor": "<vendor_name>",
                 "total_price": "<total_price>",
-                "approved": true,
+                "approved": True,
                 "format": "<format>",
                 "payment_instruction": "<payment_instruction>",
-                "notes": "<notes>"
+                "notes": "<notes>",
+                "status": <True|False>
             }
             """
             )

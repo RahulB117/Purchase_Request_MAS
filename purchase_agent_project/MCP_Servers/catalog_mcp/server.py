@@ -36,9 +36,10 @@ def build_catalog(query: str) -> str:
     except Exception as e:
         return f"API fetch error: {e}"
 
+    collection.delete(where={"unit_price": {"$gte": 0}})
     matching = [p for p in products if query.lower() in p["title"].lower()]
     if not matching:
-        return f"No matches found for '{query}'."
+        return {"error": f"No matches found for '{query}'."}
 
     titles = [p["title"] for p in matching]
     embeddings = embedder.encode(titles).tolist()
@@ -50,7 +51,7 @@ def build_catalog(query: str) -> str:
         collection.add(
             documents=[product["title"]],
             embeddings=[embeddings[i]],
-            metadatas=[{"vendor": "FakeStore", "unit_price": round(product["price"], 2)}],
+            metadatas=[{"name": product["title"], "vendor": "FakeStore", "unit_price": round(product["price"], 2)}],
             ids=[f"{product['id']}_{query}_{i}"]
         )
     print(f"[build_catalog] Collection count AFTER insert: {collection.count()}")
@@ -62,7 +63,10 @@ def get_catalog_item(item_name: str) -> list:
     """
     Returns top-5 semantically matched products to the item name.
     """
-    return _fetch_catalog(item_name)
+    entries = _fetch_catalog(item_name)
+    if not entries:
+        return {"error": f"No items found for '{item_name}'."}
+    return entries
 
 @mcp.tool()
 def get_price(item_name: str, quantity: int) -> dict[str, Any]:

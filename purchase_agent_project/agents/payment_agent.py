@@ -21,19 +21,27 @@ class PaymentAgent(Agent):
       "total_price": 219.9,
       "currency": "USD",
       "approved": True/False,
-      "reason": "reasons for approval/denial"
+      "reason": "reasons for approval/denial",
+      "status": <True/False>
     }
     Generates payment instructions in email, JSON or CSV,
     Flags for manual review when approved is False,
     Adds reminder for payment
     """
     async def run(self, input_json: dict):
-        requester    = input_json.get("requester")
-        vendor       = input_json.get("vendor")
-        amount       = input_json.get("total_price")
-        currency     = input_json.get("currency", "USD")
-        approved     = input_json.get("approved", False)
-        reason       = input_json.get("reason", "")
+        requester = input_json.get("requester")
+        vendor = input_json.get("vendor")
+        amount = input_json.get("total_price")
+        currency = input_json.get("currency", "USD")
+        approved = input_json.get("approved", False)
+        reason = input_json.get("reason", "")
+        status = input_json["status"]
+        if not status:
+            return {
+                **input_json,
+                "format": "NA",
+                "payment_instruction": "NA",
+            }
 
         # If not approved, require manual review
         if not approved:
