@@ -28,13 +28,12 @@ class PolicyAgent(Agent):
     Calls the MCP tool 'check_policy' from policy_mcp server to verify if the request is within policy limits.
     Returns an output JSON:
     {
-        "requester": "Name of requester",
-        "vendor": "Name of vendor",
-        "total_price": 219.9,
-        "approved": "true or false",
-        "threshold": 1000.0,
-        "preferred_vendors": ["Vendor_1","Vendor_2"],
-        "reason": "Within policy limits"
+        "requester": "<requester_name>",
+        "vendor": "<vendor_name>",
+        "total_price": <total_price>,
+        "approved": true/false,
+        "reason": "<reason_for_approval_or_denial>",
+        "escalate": true/false
     }
     """
     def __init__(self, **kwargs):

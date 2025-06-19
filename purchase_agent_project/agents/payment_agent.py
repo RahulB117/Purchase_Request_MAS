@@ -23,7 +23,7 @@ class PaymentAgent(Agent):
       "approved": True/False,
       "reason": "reasons for approval/denial"
     }
-    Generates payment instructions in JSON and CSV,
+    Generates payment instructions in email, JSON or CSV,
     Flags for manual review when approved is False,
     Adds reminder for payment
     """

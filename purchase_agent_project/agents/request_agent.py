@@ -1,4 +1,5 @@
 import os, asyncio
+from textwrap import dedent
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -8,12 +9,12 @@ assert os.getenv("OPENAI_API_KEY"), "Missing OPENAI_API_KEY"
 
 class RequestAgent(Agent):
     async def run(self, user_input: str):
-        prompt = f"""
+        prompt = dedent(f"""
 You are a procurement parser. Convert the user's request into JSON with:
 request_id, item, quantity, requester, date (YYYY-MM-DD).
 
 User request: "{user_input}"
-"""
+""")
         response = self.llm.call(prompt)
         return response
 

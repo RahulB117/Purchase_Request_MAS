@@ -55,15 +55,17 @@ class PriceAgent(Agent):
         1. Build catalog for the requested item
         2. Search for top matches in the catalog
         3. Get price for the requested quantity
-        4. Return structured output JSON with vendor and pricing details
-
-        {
-            "request_id":  request_id,
-            "vendor":      choice["vendor"],
-            "unit_price":  choice["unit_price"],
-            "total_price": round(choice["unit_price"] * quantity, 2),
-            "currency":    "USD"
-        }
+        4. Return structured output JSON with vendor and pricing details:
+            {
+                "request_id": "<request_id>",
+                "requester": "<requester_name>",
+                "vendor": "<vendor_name>",
+                "unit_price": <unit_price>,
+                "quantity": <quantity>,
+                "total_price": <total_price>,
+                "currency": "USD",
+                "reason": "<reason_for_choice>"
+            }
         """
         request_id = request_json.get("request_id")
         item       = request_json.get("item")
