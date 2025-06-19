@@ -73,13 +73,18 @@ class PriceAgent(Agent):
 
         plan_prompt = textwrap.dedent(f"""
             You are a pricing agent. The user wants {quantity}×'{item}'.
+
+            IMPORTANT: The item catalog starts out empty for each new item.
+            To search for an item, you must first call 'build_catalog' with the item as a query.
+            Only after building the catalog will 'get_catalog_item' return results.
+
             Should you call:
                 1) build_catalog(query)
                 2) get_catalog_item(item_name)
             Respond with JSON: {{ "tool": "<tool_name>", "params": {{ ... }} }}
             """)
         plan_resp = await asyncio.to_thread(self.llm.call, plan_prompt)
-        #print("PLAN:", plan_resp)
+        # print("PLAN:", plan_resp)
         clean = plan_resp.strip()
         clean = re.sub(r"^```(?:json)?\s*", "", clean)
         clean = re.sub(r"\s*```$", "", clean)
@@ -92,13 +97,15 @@ class PriceAgent(Agent):
             # direct get_catalog_item or other tool
             catalog = await self.call_tool(plan["tool"], plan["params"])
 
+        # print("CATALOG:", catalog)
         decision_prompt = textwrap.dedent(f"""
             Here are the catalog entries: {json.dumps(catalog, indent=2)}
             Which vendor should we pick for {quantity}×'{item}', and why?
+            Ensure to calculate the unit_price as the price of a single item.
             Answer with JSON: {{ "vendor": string, "unit_price": number, "reason": string }}
             """)
         decision_resp = await asyncio.to_thread(self.llm.call, decision_prompt)
-        #print("DECISION:", decision_resp)
+        # print("DECISION:", decision_resp)
         clean = decision_resp.strip()
         clean = re.sub(r"^```(?:json)?\s*", "", clean)
         clean = re.sub(r"\s*```$", "", clean)
